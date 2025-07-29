@@ -1,0 +1,229 @@
+---
+title: "EDA for Diabetes Health Indicators Information - 2015"
+format: html
+editor: visual
+---
+
+## Introduction
+
+This project uses the **Diabetes Health Indicators BRFSS 2015** dataset from Kaggle to explore indicators potentially related to diabetes status. This dataset includes information on lifestyle, personal demographics, and medical history from a large sample of people.
+
+This EDA will focus on three predictors in particular:
+- **BMI (Body Mass Index)**: a medically defined value to assess potential obesity using height and weight (high levels of body fat is commonly associated with diabetes)
+- **gen_hlth**: a categorical variable describing the general health rating one gives themselves  (lower levels ofgeneral health could be related to prevelance/risk of diabetes)
+- **HighBP (High Blood Pressure)**: a binary variable indicating whether or not the subject has high blood pressure (a common comorbidity with diabetes)
+
+
+We will also look at the response variable, `diabetes_binary`, which indicates the presence or diabetes (or lack thereof).
+
+Our goal with this exploratory data analysis is to identify potential relationships in predictors and response. That will help us gain initial information on how the data works as well as be useful in further analysis to predict whether an individual has diabetes given these predictors, which is the ultimate goal of this project (i.e. the modeling portion).
+
+## Data
+
+We will start with reading in the data, cleaning the names with the `janitor` package, and ensuring each predictor is the correct type.
+```{r}
+#| message: false
+library(tidyverse)
+library(janitor)
+
+data <- read_csv("diabetes_binary_health_indicators_BRFSS2015.csv") |>
+  clean_names()
+
+glimpse(data)
+```
+
+We can see from the `glimpse` above that every variable is currently a `dbl`, meaning that we should go variable by variable to determine if it should be changed to a factor (angd give the levels appropriate names). First, though, we will quickly check for any missing values in the data:
+
+```{r}
+#missing
+colSums(is.na(data))
+
+```
+
+Now that we see that there are no missing values in any of the variables, we will proceed with turning these variables into appropriate factors (or leaving them be). We do this below:
+
+```{r}
+data <- data %>%
+  mutate(diabetes_binary = factor(diabetes_binary, levels = c(0, 1),
+                                  labels = c("No Diabetes", "Diabetes")),
+         high_bp = factor(high_bp, levels = c(0,1),
+                          labels = c("No High BP", "High BP")),
+         high_chol = factor(high_chol, levels = c(0,1),
+                          labels = c("No High Chol", "High Chol")),
+         chol_check = factor(high_bp, levels = c(0,1),
+                          labels = c("No Check", "Check")),
+         smoker = factor(smoker, levels = c(0,1),
+                         labels = c("No", "Yes")),
+         stroke = factor(stroke, levels = c(0,1),
+                         labels = c("No Stroke", "Stroke")),
+         heart_diseaseor_attack = factor(heart_diseaseor_attack,
+                                         levels = c(0,1),
+                                         labels = c("No", "Yes")),
+         phys_activity = factor(phys_activity, levels = c(0,1),
+                                labels = c("No", "Yes")),
+         fruits = factor(fruits, levels = c(0,1),
+                         labels = c("No", "Yes")),
+         veggies = factor(veggies, levels = c(0,1),
+                          labels = c("No", "Yes")),
+         hvy_alcohol_consump = factor(hvy_alcohol_consump,
+                                      levels = c(0,1),
+                                      labels = c("No", "Yes")),
+         any_healthcare = factor(any_healthcare,
+                                 levels = c(0,1),
+                                 labels = c("No", "Yes")),
+         no_docbc_cost = factor(no_docbc_cost, levels = c(0,1),
+                                labels = c("No", "Yes")),
+         gen_hlth = factor(gen_hlth, levels = c(1,2,3,4,5),
+                           labels = c("excellent",
+                                      "very good",
+                                      "good",
+                                      "fair",
+                                      "poor")),
+         diff_walk = factor(diff_walk, levels = c(0,1),
+                            labels = c("No", "Yes")),
+         sex = factor(sex, levels = c(0,1),
+                      labels = c("female", "male")),
+         age = factor(age, levels = c(1,2,3,4,5,6,7,8,9,10,11,12,13),
+                      labels = c("18-24",
+                                 "25-29",
+                                 "30-34",
+                                 "35-39",
+                                 "40-44",
+                                 "45-49",
+                                 "50-54",
+                                 "55-59",
+                                 "60-64",
+                                 "65-69",
+                                 "70-74",
+                                 "75-79",
+                                 "80+")),
+         education = factor(education, levels = c(1,2,3,4,5,6),
+                            labels = c("Never Attended",
+                                       "Grades 1-8",
+                                       "Grades 9-11",
+                                       "Grade 12/GED",
+                                       "Some college",
+                                       "College Graduate")),
+         income = factor(income, levels = c(1,2,3,4,5,6,7,8),
+                         labels = c("<$10,000",
+                                    "$10,000-$14,999",
+                                    "$15,000-$19,999",
+                                    "$20,000-$24,999",
+                                    "$25,000-$34,999",
+                                    "$35,000-$49,999",
+                                    "$50,000-$74,999",
+                                    "$75,000+")))
+
+
+glimpse(data)
+
+```
+
+We can see from the glimpse above that all of the variables are of the correct type.
+
+## Summarizations
+
+### Univariate Analysis
+
+Now, we will look at the univariate summaries of the three variables listed above. We will start with BMI.
+
+```{r}
+#bmi
+summary(data$bmi)
+
+ggplot(data, aes(x = bmi)) +
+  geom_histogram(binwidth = 2, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of BMI", x = "BMI", y = "Count")
+```
+
+We see a right skew to this data, which is sensible given that higher bmi values align with diabetes risk. Given the summary, the BMI of 98 does not make sense. Let's investigate that further:
+
+```{r}
+filter(data, bmi == 98)
+```
+
+There seems to be a mistake here. Many of the entries have this value, which is not medically possible.
+
+
+Next, we will look at high blood pressure.
+
+```{r}
+## High Blood Pressure
+ggplot(data, aes(x = high_bp)) +
+  geom_bar(fill = "salmon") +
+  labs(title = "Distribution of High Blood Pressure Status",
+       x = "High Blood Pressure", y = "Count")
+```
+
+High blood pressure seems to have a fairly even split between the 2 variables. There are more observations in this data set without high blood pressure than with.
+
+
+Next, we will look at general health
+
+```{r}
+## Physical Activity
+ggplot(data, aes(x = gen_hlth)) +
+  geom_bar(fill = "seagreen") +
+  labs(title = "Distribution of General Health Ratings",
+       x = "General Health Rating", y = "Count")
+```
+
+This looks to be a relatively normal looking split. There is a fair amount of representation in each level. Though, this would be more useful to compare to diabetes to see where they lay together.
+
+Next, we will look into the spread of diabetes.
+
+```{r}
+#diabetes
+table(data$diabetes_binary)
+
+ggplot(data, aes(x = diabetes_binary)) +
+  geom_bar(fill = "mediumpurple") +
+  labs(title = "Distribution of Diabetes Status",
+       x = "Diabetes Status", y = "Count") +
+  theme_minimal()
+```
+
+It can be seen in the plot and table above that there are far fewer cases of diabetes here than there are people without a diagnosis in this data set. We should keep this in mind as we proceed in this analysis and modeling.
+
+
+To get more information, we will now look toward bivariate analysis with the response variable.
+
+### Bivariate Analysis
+
+We will start with analysis of BMI with diabetes.
+
+```{r}
+## BMI vs Diabetes
+ggplot(data, aes(x = diabetes_binary, y = bmi, fill = diabetes_binary)) +
+  geom_boxplot() +
+  labs(title = "BMI by Diabetes Status",
+       x = "Diabetes Status", y = "BMI") +
+  scale_fill_manual(values = c("No Diabetes" = "lightblue", "Diabetes" = "pink")) +
+  theme(legend.position = "none")
+
+
+## High BP vs Diabetes
+ggplot(data, aes(x = high_bp, fill = diabetes_binary)) +
+  geom_bar(position = "fill") +
+  labs(title = "Proportion of Diabetes by High Blood Pressure",
+       x = "High Blood Pressure", y = "Proportion") +
+  scale_fill_manual(values = c("No Diabetes" = "lightblue", "Diabetes" = "pink")) +
+  theme_minimal()
+
+
+## Physical Activity vs Diabetes
+ggplot(data, aes(x = phys_activity, fill = diabetes_binary)) +
+  geom_bar(position = "fill") +
+  labs(title = "Proportion of Diabetes by Physical Activity",
+       x = "Physical Activity", y = "Proportion") +
+  scale_fill_manual(values = c("No Diabetes" = "lightblue", "Diabetes" = "pink")) +
+  theme_minimal()
+
+
+```
+
+## Commentary
+
+
+
+[Click here for the Modeling Page](Modeling.html)
