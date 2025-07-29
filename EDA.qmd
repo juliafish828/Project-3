@@ -6,30 +6,32 @@ editor: visual
 
 ## Introduction
 
-Over the course of the past few decades, diabetes prevalence in everyday life has sky-rocketed. With many lifestyle aspects changing alongside this disease's relevance, it becomes extremely important to look into which 
+Over the course of the past few decades, diabetes prevalence in everyday life has sky-rocketed. With many lifestyle aspects changing alongside this disease's relevance, it becomes extremely important to look into several factors to discern potential patterns and relationships between diabetes diagnoses and other medical and lifestyle information. We will do part of this exploration here.
 
 This project uses the **Diabetes Health Indicators BRFSS 2015** dataset from Kaggle to explore indicators potentially related to diabetes status. This dataset includes information on lifestyle, personal demographics, and medical history from a large sample of people.
 
-This data was collected using The Behavioral Risk Factor Surveillance System, a CDC annual telephone survey (Teboul 2021). This data gets organized into 3 data sets for increased organization, usability, and potential for analysis.
+This data was collected using The Behavioral Risk Factor Surveillance System, a CDC annual telephone survey (Teboul 2021). This data gets placed into 3 data sets for increased organization, usability, and potential for analysis.
 
-This EDA will focus on three predictors in particular:
+This EDA will focus on three predictors in particular as well as the response:
+
 - **BMI (Body Mass Index)**: a medically defined value to assess potential obesity using height and weight (high levels of body fat is commonly associated with diabetes)
-- **gen_hlth**: a categorical variable describing the general health rating one gives themselves  (lower levels ofgeneral health could be related to prevelance/risk of diabetes)
+- **gen_hlth (General Health)**: a categorical variable describing the general health rating one gives themselves  (lower levels of general health could be related to prevelance/risk of diabetes)
 - **HighBP (High Blood Pressure)**: a binary variable indicating whether or not the subject has high blood pressure (a common comorbidity with diabetes)
 
 
-We will also look at the response variable, `diabetes_binary`, which indicates the presence or diabetes (or lack thereof).
+As stated above, we will also look at the response variable, `diabetes_binary`, which indicates the presence of diabetes (or lack thereof).
 
 Our goal with this exploratory data analysis is to identify potential relationships in predictors and response. That will help us gain initial information on how the data works as well as be useful in further analysis to predict whether an individual has diabetes given these predictors, which is the ultimate goal of this project (i.e. the modeling portion).
 
 ## Data
 
-We will start with reading in the data, cleaning the names with the `janitor` package (to get common naming conventions), and ensuring each predictor is pf the correct type.
+We will start with reading in the data, cleaning the names with the `janitor` package (to get common naming conventions), and ensuring each predictor is of the correct type.
 
 ```{r}
 #| message: false
 library(tidyverse)
 library(janitor)
+library(dplyr)
 
 data <- read_csv("diabetes_binary_health_indicators_BRFSS2015.csv") |>
   clean_names()
@@ -122,11 +124,11 @@ glimpse(data)
 
 ```
 
-We can see from the glimpse above that all of the variables are of the correct type.
+We can see from the `glimpse` above that all of the variables are of the correct type.
 
 ## Summarizations
 
-It is extremely important to analyze data on a high level and in multiple ways. To begin this multi-faceted analysis, we will start with visually exploring the data with tables, plots, and graphs.
+It is extremely important to analyze data on a high level and from multiple angles. To begin this multi-faceted analysis, we will start with visually exploring the data with tables, plots, and graphs.
 
 ### Univariate Analysis
 
@@ -146,7 +148,7 @@ We see a right skew to this data, which is sensible given that higher BMI values
 filter(data, bmi == 98)
 ```
 
-There could be a mistake here. Many of the entries have this value, which is very uncommon medically. Though, it is important to note that only 22 of the `r nrow(data)` have this value. For exploratory purposes, let's look at all the values that BMI supposedly takes on in this data set.
+There could be a mistake here. Many of the entries have this value, which is very uncommon medically. Though, it is important to note that only 7 of the `r nrow(data)` have this value. For exploratory purposes, let's look at all the values that BMI supposedly takes on in this data set.
 
 ```{r}
 sort(unique(data$bmi))
@@ -154,7 +156,7 @@ sort(unique(data$bmi))
 In this list, there are several values that are shocking (namely, the values above 70). Since there are many unique values in the very high range, it is not looking like the 98 BMI values are out of place. We will do one final check with a boxplot.
 
 ```{r}
-ggplot(train, aes(y = bmi)) +
+ggplot(data, aes(y = bmi)) +
   geom_boxplot(fill = "skyblue") +
   labs(
     title = "BMI Distribution",
@@ -171,12 +173,12 @@ Next, we will look at high blood pressure.
 ```{r}
 # high blood pressure
 ggplot(data, aes(x = high_bp)) +
-  geom_bar(fill = "salmon") +
+  geom_bar(fill = "pink") +
   labs(title = "Distribution of High Blood Pressure Status",
        x = "High Blood Pressure", y = "Count")
 ```
 
-High blood pressure seems to have a fairly even split between the 2 variables. There are more observations in this data set without high blood pressure than with this condition. Looking just at this variable univariately, not much information can be taken away. We will do mre exploration of this data in relation to the response later in this report.
+High blood pressure seems to have a some balance between the 2 levels. However, there still are more observations in this data set without high blood pressure than those with this condition. Looking just at this variable univariately, not much information can be taken away. We will do more exploration of this data in relation to the response later in this report.
 
 
 Next, we will look at general health rating.
@@ -189,9 +191,9 @@ ggplot(data, aes(x = gen_hlth)) +
        x = "General Health Rating", y = "Count")
 ```
 
-This looks to be a relatively normal looking split. There is a fair amount of representation in each level. Though, this would be more useful to compare to diabetes to see where they lay together.
+This looks to be a relatively normal looking split. There is a fair amount of representation in each level. Though, similar to high blood pressure, this would be more useful to compare to diabetes to see where they lay together. However, we will proceed with no further investigation everything looks to be in order from this plot.
 
-Next, we will look into the spread of diabetes.
+Next, we will look into the spread of diabetes, the response variable in this instance.
 
 ```{r}
 #diabetes
@@ -204,10 +206,8 @@ ggplot(data, aes(x = diabetes_binary)) +
   theme_minimal()
 ```
 
-It can be seen in the plot and table above that there are far fewer cases of diabetes here than there are people without a diagnosis in this data set. We should keep this in mind as we proceed in this analysis and modeling.
+It can be seen in the plot and table above that there are far fewer cases of diabetes here than there are people without a diagnosis in this data set. We should keep this in mind as we proceed in this analysis and modeling. Though we can see above that there are only 2 levels (as expected), and they are both represented in this data. With that in mind, we will proceed with bivariate analysis to get more information on how the variables exist and "move" together (if they do).
 
-
-To get more information, we will now look toward bivariate analysis with the response variable.
 
 ### Bivariate Analysis
 
@@ -219,32 +219,67 @@ ggplot(data, aes(x = diabetes_binary, y = bmi, fill = diabetes_binary)) +
   geom_boxplot() +
   labs(title = "BMI by Diabetes Status",
        x = "Diabetes Status", y = "BMI") +
-  scale_fill_manual(values = c("No Diabetes" = "lightblue", "Diabetes" = "pink")) +
+  scale_fill_manual(values = c("No_Diabetes" = "lightblue", "Diabetes" = "pink")) +
   theme(legend.position = "none")
+```
 
+It can be seen from the plot above that the spread of BMI is not much different for those with a diabetes diagnosis versus those without. The median as well as Q1 and Q3 values are all higher for those with diabetes, but not by much. Let's look at a table with each 5 number summary to decipher these exact differences:
 
+```{r}
+summary_table <- data %>%
+  group_by(diabetes_binary) %>%
+  summarise(
+    Min = min(bmi, na.rm = TRUE),
+    Q1 = quantile(bmi, 0.25, na.rm = TRUE),
+    Median = median(bmi, na.rm = TRUE),
+    Q3 = quantile(bmi, 0.75, na.rm = TRUE),
+    Max = max(bmi, na.rm = TRUE)
+  )
+
+print(summary_table)
+
+```
+
+From the five number summaries above, we can also see that there is not much difference between the bmi values of those with a diabetes diagnosis in this data set compared to those without one. The Q1, median, and Q3 values are 3-4 units higher, which is a medically significant amount. However, given the large range of these values, that is not a large percentage change across all possible BMIs.
+
+We will now move on to analyze high blood pressure and diabetes together.
+
+```{r}
 ## High BP vs Diabetes
 ggplot(data, aes(x = high_bp, fill = diabetes_binary)) +
   geom_bar(position = "fill") +
   labs(title = "Proportion of Diabetes by High Blood Pressure",
        x = "High Blood Pressure", y = "Proportion") +
-  scale_fill_manual(values = c("No Diabetes" = "lightblue", "Diabetes" = "pink")) +
+  scale_fill_manual(values = c("No_Diabetes" = "lightblue", "Diabetes" = "pink")) +
   theme_minimal()
+```
+
+The plot above is another visual representation of the low percentage of people in this data set with a diabetes diagnosis (i.e. not a lot of pink compared to the blue). It is important to note, however, that there is a lot higher of a percentage of people with a diabetes diagnosis that also have high blood pressure than those who have diabetes and not high blood pressure. We will explore this numerically with a contingency table.
+
+```{r}
+prop.table(table(data$high_bp, data$diabetes_binary), margin = 1)
+```
+
+This shows that large difference in those with a diabetes diagnosis once again. In addition, the lower diagonal has more values than the other diagonal, showing once again that having a high blood pressure diagnosis seemingly impacts the risk/prevalence of diabetes and vice versa. This potential connection is great to know before moving to model training, selection, and fitting.
+
+Lastly, we will investigate general health rating with diabetes presence.
 
 
+```{r}
 ## General health vs Diabetes
 ggplot(data, aes(x = gen_hlth, fill = diabetes_binary)) +
   geom_bar(position = "fill") +
   labs(title = "Proportion of Diabetes by General Health Rating",
        x = "General Health", y = "Proportion") +
-  scale_fill_manual(values = c("No Diabetes" = "lightblue", "Diabetes" = "pink")) +
+  scale_fill_manual(values = c("No_Diabetes" = "lightblue", "Diabetes" = "pink")) +
   theme_minimal()
 
 
 ```
 
-## Commentary
+This plot is extremely helpful in determining information on how these variables intertwine. As stated earlier during univariate analysis, it was challenging to have impactful takeaways on just general health rating. This plot, however, shows that diabetes monotonically increases as the general health rating gets lower (categorically lower). This confirms that there could possibly be an inverse relationship between these variables, which could point to general health rating being a good predictor for predicting diabetes status using this data.
 
+Now that we have explored these variables and their relationship on the response thoroughly, we will now move on to modeling. Click the link below to follow along!
 
 
 [Click here for the Modeling Page](Modeling.html)

@@ -22,6 +22,7 @@ library(tidyverse)
 library(caret)
 library(fastDummies)
 library(rpart)
+library(rsample)
 ```
 
 ```{r}
