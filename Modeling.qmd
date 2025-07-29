@@ -1,2 +1,206 @@
+---
+title: "Modeling"
+format: html
+editor: visual
+---
+
+## Introduction
+
+In this section, we build predictive models to attempt to classify individuals as diabetic or non-diabetic using the BRFSS 2015 dataset explored in the EDA page. This data set comes from a CDC phone survey conducted annually with over 20 variables concerning lifestyle, overall health, medical history (Treboul 2021). To do this modeling, we'll use three different techniques for training and comparison:
+
+- Logistic Regression
+- Classification Tree
+- Random Forest
+
+We'll evaluate each model's performance using 5-fold cross-validation and the log-loss metric. The final model will be selected based on performance on the test set that will be created below.
+
+To begin this modeling process, let us first load in our packages and split the data into a train and test sets. Noting the imbalance of diabetes diagnoses in this data set relative to those two do no have a diagnosis, we will stratify on that with our 70-30 split to ensure representation in each set.
+
+```{r}
+#| message: false
+library(tidyverse)
+library(caret)
+library(fastDummies)
+library(rpart)
+```
+
+```{r}
+set.seed(123)
+split <- initial_split(data, prop = 0.7, strata = diabetes_binary)
+train <- training(split)
+test <- testing(split)
+```
+
+
+Next, we will set up our `trainControl`. This allows us to specify that we want 5-fold cross validation as well as a log loss metric to be used in model training and selection.
+
+```{r}
+ctrl <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE,
+  summaryFunction = mnLogLoss,
+  savePredictions = "final"
+)
+```
+
+## Logistic Regression
+
+First, we will fit a logistic regression model. This is a parametric model because it assumes a generalized linear model form for the relationship between response and predictors. It is also used as a classification algorithm to model the probability of a binary outcome based on one or more predictor variables, which is very appropriate for this data. This model does not do variable selection, so we will manually select our variables for our 3 logistic model fits. Standardization of the predictors does not need to occur, but dummy variables must be made in place of factor variables; `train()` does this automatically.
+
+Our 3 models will be as follows:
+
+- diabetes on BMI and high blood pressure presence
+- diabetes on BMI, high blood pressure presence, and general health rating
+- diabetes on BMI, high blood pressure presence, general health rating, and recent physical activity level
+
+These models are trained and fit for comparison below:
+
+```{r}
+# logit model 1
+logit1 <- train(
+  diabetes_binary ~ bmi + high_bp,
+  data = train,
+  method = "glm",
+  family = binomial,
+  metric = "logLoss",
+  trControl = ctrl)
+
+# logit model 2
+logit2 <- train(
+  diabetes_binary ~ bmi + high_bp + gen_hlth,
+  data = train,
+  method = "glm",
+  family = binomial,
+  metric = "logLoss",
+  trControl = ctrl)
+
+# logit model 3
+logit3 <- train(
+  diabetes_binary ~ bmi + high_bp + gen_hlth + phys_activity,
+  data = train,
+  method = "glm",
+  family = binomial,
+  metric = "logLoss",
+  trControl = ctrl)
+```
+
+With those models fit, we will now compare log loss values to select the best performing logistic regression model.
+
+
+```{r}
+logloss_results <- tibble(
+  Model = c("Model 1", "Model 2", "Model 3"),
+  LogLoss = c(
+    min(logit1$results$logLoss),
+    min(logit2$results$logLoss),
+    min(logit3$results$logLoss)
+  )
+)
+
+logloss_results
+```
+
+We can see here that model 2 has the lowest log loss, so we will select that as our best performing model and move on to compare that fit to 2 other model fits later in this report. It is important to know that there is a very small difference between these 2 log loss values (around 0.00015), so it could be desirable to select the simpler of these two models since it required fewer variables to get to a very similar result. For the sake of choosing the overall "best" performing model, we will select the one with the lowest logloss here.
+
+
+```{r}
+best_log_model <- logit3
+```
+
+## Classification Tree
+
+Next, we will fit a classification tree.
+
+Now we will fit a simple tree on this model. This is a nonparametric model due to the lack of assumption of any underlying information aside from the data itself. This model will tue on the cp value, which will allow us to know to what extent pruning should occur (i.e. how many splits the tree should have). Inference would be difficult for this model due to its free flowing, flexible structure. This model does perform variable selection by splitting on the variable deemed most siginificant first. Standardization of predictors does not need to occur to use this model appropriately.
+
+A classification tree is a decision tree model that splits the data based on feature values to classify observations. It’s easy to interpret and can capture nonlinear relationships. However, it can overfit, so we tune its complexity using the **complexity parameter (cp)**.
+
+We’ll start with fitting our `cp` tuning grid. Then, we will fit a classification tree using the `rpart` method in `caret` and select the best cp based on the log-loss with 5-fold cross-validation discussed and used above.
+
+
+```{r}
+cp_grid <- expand.grid(cp = seq(0.001, 0.1, by = 0.005))
+
+tree_model <- train(
+  diabetes_binary ~ bmi + high_bp + gen_hlth,
+  data = train,
+  method = "rpart",
+  trControl = ctrl,
+  tuneGrid = cp_grid,
+  metric = "logLoss"
+)
+```
+
+
+plot tuning results
+
+```{r}
+# Plotting the log-loss for different cp values
+plot(tree_model)
+```
+
+best model summary
+
+```{r}
+# Check best cp and logLoss
+tree_model$bestTune
+min(tree_model$results$logLoss)
+```
+
+final model for comparison
+
+```{r}
+best_tree_model <- tree_model
+```
+
+## Random Forest
+
+A random forest is an ensemble method that builds many decision trees and aggregates their predictions. It reduces overfitting and generally provides better accuracy than a single tree. It also handles interactions and nonlinearities well.
+
+We'll use `ranger` via the `caret` package and tune two hyperparameters:
+- `mtry`: number of predictors sampled for each split
+- `min.node.size`: minimum number of samples in a terminal node
+
+fit the random forest
+
+```{r}
+library(ranger)
+
+# Set a tuning grid
+rf_grid <- expand.grid(
+  mtry = c(2, 3, 4),
+  splitrule = "gini",
+  min.node.size = c(1, 5, 10)
+)
+
+rf_model <- train(
+  diabetes_binary ~ bmi + high_bp + gen_hlth,
+  data = train,
+  method = "rf",
+  trControl = ctrl,
+  tuneGrid = rf_grid,
+  metric = "logLoss",
+  importance = 'impurity'
+)
+```
+
+evaluate and save
+
+```{r}
+# View the best parameters
+rf_model$bestTune
+min(rf_model$results$logLoss)
+
+# Save best model
+best_rf_model <- rf_model
+```
+
+variable importance plot
+
+```{r}
+varImp(rf_model) |>
+  plot(main = "Variable Importance - Random Forest")
+```
 
 

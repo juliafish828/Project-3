@@ -6,7 +6,11 @@ editor: visual
 
 ## Introduction
 
+Over the course of the past few decades, diabetes prevalence in everyday life has sky-rocketed. With many lifestyle aspects changing alongside this disease's relevance, it becomes extremely important to look into which 
+
 This project uses the **Diabetes Health Indicators BRFSS 2015** dataset from Kaggle to explore indicators potentially related to diabetes status. This dataset includes information on lifestyle, personal demographics, and medical history from a large sample of people.
+
+This data was collected using The Behavioral Risk Factor Surveillance System, a CDC annual telephone survey (Teboul 2021). This data gets organized into 3 data sets for increased organization, usability, and potential for analysis.
 
 This EDA will focus on three predictors in particular:
 - **BMI (Body Mass Index)**: a medically defined value to assess potential obesity using height and weight (high levels of body fat is commonly associated with diabetes)
@@ -20,7 +24,8 @@ Our goal with this exploratory data analysis is to identify potential relationsh
 
 ## Data
 
-We will start with reading in the data, cleaning the names with the `janitor` package, and ensuring each predictor is the correct type.
+We will start with reading in the data, cleaning the names with the `janitor` package (to get common naming conventions), and ensuring each predictor is pf the correct type.
+
 ```{r}
 #| message: false
 library(tidyverse)
@@ -32,30 +37,28 @@ data <- read_csv("diabetes_binary_health_indicators_BRFSS2015.csv") |>
 glimpse(data)
 ```
 
-We can see from the `glimpse` above that every variable is currently a `dbl`, meaning that we should go variable by variable to determine if it should be changed to a factor (angd give the levels appropriate names). First, though, we will quickly check for any missing values in the data:
+We can see from the `glimpse` above that every variable is currently a `dbl`, meaning that we should go variable by variable to determine if it should be changed to a factor (and give the levels appropriate labels). First, though, we will quickly check for any missing values in the data:
 
 ```{r}
-#missing
 colSums(is.na(data))
-
 ```
 
 Now that we see that there are no missing values in any of the variables, we will proceed with turning these variables into appropriate factors (or leaving them be). We do this below:
 
 ```{r}
-data <- data %>%
+data <- data |>
   mutate(diabetes_binary = factor(diabetes_binary, levels = c(0, 1),
-                                  labels = c("No Diabetes", "Diabetes")),
+                                  labels = c("No_Diabetes", "Diabetes")),
          high_bp = factor(high_bp, levels = c(0,1),
-                          labels = c("No High BP", "High BP")),
+                          labels = c("No_High_BP", "High_BP")),
          high_chol = factor(high_chol, levels = c(0,1),
-                          labels = c("No High Chol", "High Chol")),
-         chol_check = factor(high_bp, levels = c(0,1),
-                          labels = c("No Check", "Check")),
+                          labels = c("No_High_Chol", "High_Chol")),
+         chol_check = factor(chol_check, levels = c(0,1),
+                          labels = c("No_Check", "Check")),
          smoker = factor(smoker, levels = c(0,1),
                          labels = c("No", "Yes")),
          stroke = factor(stroke, levels = c(0,1),
-                         labels = c("No Stroke", "Stroke")),
+                         labels = c("No_Stroke", "Stroke")),
          heart_diseaseor_attack = factor(heart_diseaseor_attack,
                                          levels = c(0,1),
                                          labels = c("No", "Yes")),
@@ -98,12 +101,12 @@ data <- data %>%
                                  "75-79",
                                  "80+")),
          education = factor(education, levels = c(1,2,3,4,5,6),
-                            labels = c("Never Attended",
-                                       "Grades 1-8",
-                                       "Grades 9-11",
-                                       "Grade 12/GED",
-                                       "Some college",
-                                       "College Graduate")),
+                            labels = c("Never_Attended",
+                                       "Grades_1_8",
+                                       "Grades_9_11",
+                                       "Grade_12_GED",
+                                       "Some_college",
+                                       "College_Graduate")),
          income = factor(income, levels = c(1,2,3,4,5,6,7,8),
                          labels = c("<$10,000",
                                     "$10,000-$14,999",
@@ -123,12 +126,13 @@ We can see from the glimpse above that all of the variables are of the correct t
 
 ## Summarizations
 
+It is extremely important to analyze data on a high level and in multiple ways. To begin this multi-faceted analysis, we will start with visually exploring the data with tables, plots, and graphs.
+
 ### Univariate Analysis
 
-Now, we will look at the univariate summaries of the three variables listed above. We will start with BMI.
+Now, we will look at the univariate summaries of the four variables listed above. We will start with BMI.
 
 ```{r}
-#bmi
 summary(data$bmi)
 
 ggplot(data, aes(x = bmi)) +
@@ -136,32 +140,49 @@ ggplot(data, aes(x = bmi)) +
   labs(title = "Distribution of BMI", x = "BMI", y = "Count")
 ```
 
-We see a right skew to this data, which is sensible given that higher bmi values align with diabetes risk. Given the summary, the BMI of 98 does not make sense. Let's investigate that further:
+We see a right skew to this data, which is sensible given that higher BMI values align with diabetes risk. Those values start to taper off at a BMI value of 50, which is a logical value (although medically quite high). Given the numerical summary of the data, the BMI of 98 does not make sense. Let's investigate that further:
 
 ```{r}
 filter(data, bmi == 98)
 ```
 
-There seems to be a mistake here. Many of the entries have this value, which is not medically possible.
+There could be a mistake here. Many of the entries have this value, which is very uncommon medically. Though, it is important to note that only 22 of the `r nrow(data)` have this value. For exploratory purposes, let's look at all the values that BMI supposedly takes on in this data set.
+
+```{r}
+sort(unique(data$bmi))
+```
+In this list, there are several values that are shocking (namely, the values above 70). Since there are many unique values in the very high range, it is not looking like the 98 BMI values are out of place. We will do one final check with a boxplot.
+
+```{r}
+ggplot(train, aes(y = bmi)) +
+  geom_boxplot(fill = "skyblue") +
+  labs(
+    title = "BMI Distribution",
+    y = "BMI"
+  ) +
+  theme_minimal()
+```
+
+There are several outliers here on the higher side, which is another view of the right skew touched on earlier. With all of this information in mind, there are no values here that are individually unusual in the context of the data set. We will proceed here with no removals, transformations, or changes.
 
 
 Next, we will look at high blood pressure.
 
 ```{r}
-## High Blood Pressure
+# high blood pressure
 ggplot(data, aes(x = high_bp)) +
   geom_bar(fill = "salmon") +
   labs(title = "Distribution of High Blood Pressure Status",
        x = "High Blood Pressure", y = "Count")
 ```
 
-High blood pressure seems to have a fairly even split between the 2 variables. There are more observations in this data set without high blood pressure than with.
+High blood pressure seems to have a fairly even split between the 2 variables. There are more observations in this data set without high blood pressure than with this condition. Looking just at this variable univariately, not much information can be taken away. We will do mre exploration of this data in relation to the response later in this report.
 
 
-Next, we will look at general health
+Next, we will look at general health rating.
 
 ```{r}
-## Physical Activity
+## General Health
 ggplot(data, aes(x = gen_hlth)) +
   geom_bar(fill = "seagreen") +
   labs(title = "Distribution of General Health Ratings",
@@ -211,11 +232,11 @@ ggplot(data, aes(x = high_bp, fill = diabetes_binary)) +
   theme_minimal()
 
 
-## Physical Activity vs Diabetes
-ggplot(data, aes(x = phys_activity, fill = diabetes_binary)) +
+## General health vs Diabetes
+ggplot(data, aes(x = gen_hlth, fill = diabetes_binary)) +
   geom_bar(position = "fill") +
-  labs(title = "Proportion of Diabetes by Physical Activity",
-       x = "Physical Activity", y = "Proportion") +
+  labs(title = "Proportion of Diabetes by General Health Rating",
+       x = "General Health", y = "Proportion") +
   scale_fill_manual(values = c("No Diabetes" = "lightblue", "Diabetes" = "pink")) +
   theme_minimal()
 
