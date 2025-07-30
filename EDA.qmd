@@ -124,7 +124,12 @@ glimpse(data)
 
 ```
 
-We can see from the `glimpse` above that all of the variables are of the correct type.
+We can see from the `glimpse` above that all of the variables are of the correct type. We will save this locally to use in the modeling portion of this project.
+
+```{r}
+saveRDS(data, "clean_data.rds")
+```
+
 
 ## Summarizations
 
